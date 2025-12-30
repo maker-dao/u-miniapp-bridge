@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniApp Bridge - 演示</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .section {
+      background: white;
+      padding: 16px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #555;
+    }
+
+    button {
+      background: #007AFF;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    button:active {
+      opacity: 0.8;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    button.danger {
+      background: #ff3b30;
+    }
+
+    button.success {
+      background: #34c759;
+    }
+
+    .result {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f0f0f0;
+      border-radius: 6px;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .log {
+      margin-top: 12px;
+      padding: 12px;
+      background: #2c3e50;
+      color: #ecf0f1;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .log-item {
+      margin: 2px 0;
+      padding: 2px 0;
+    }
+
+    .log-time {
+      color: #95a5a6;
+      margin-right: 8px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .status.warning {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .tips {
+      background: #e7f3ff;
+      border-left: 4px solid #007AFF;
+      padding: 12px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .tips-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MiniApp Bridge 演示</h1>
+
+    <div class="section">
+      <div class="section-title">1. 初始化 SDK</div>
+      <div class="tips">
+        <div class="tips-title">提示：</div>
+        点击"模拟原生 Bridge"后，再点击"初始化 SDK"
+      </div>
+      <button onclick="setupMockBridge()" class="success">模拟原生 Bridge</button>
+      <button onclick="initSDK()" id="init-btn" disabled>初始化 SDK</button>
+      <div id="sdk-status" style="margin-top: 12px;">
+        <span class="status warning">未初始化</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">2. 调用原生方法</div>
+      <button onclick="getUserInfo()" id="btn-user" disabled>获取用户信息</button>
+      <button onclick="showToast()" id="btn-toast" disabled>显示 Toast</button>
+      <button onclick="openPage()" id="btn-page" disabled>打开页面</button>
+      <div id="method-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">3. 监听原生事件</div>
+      <button onclick="subscribeEvents()" id="btn-sub" disabled>订阅事件</button>
+      <button onclick="unsubscribeEvents()" id="btn-unsub" disabled>取消订阅</button>
+      <button onclick="sendMockEvent()" id="btn-mock-event" disabled>模拟原生发送事件</button>
+      <div id="event-status" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">4. 通信日志</div>
+      <button onclick="clearLogs()">清除日志</button>
+      <div id="logs" class="log"></div>
+    </div>
+  </div>
+
+  <script>
+    // 内联 MiniApp SDK（开发时使用，构建后替换为 import）
+    class MiniApp {
+      constructor(config = {}) {
+        this.config = {
+          debug: config.debug ?? false,
+          defaultTimeout: config.defaultTimeout ?? 5000,
+        };
+        this.eventListeners = new Map();
+        this.pendingCalls = new Map();
+        this.requestIdCounter = 0;
+        this.nativeBridge = null;
+        this.isInitialized = false;
+      }
+
+      init() {
+        if (this.isInitialized) {
+          this.log('warn', 'SDK already initialized');
+          return;
+        }
+
+        this.nativeBridge = window.NativeBridge;
+
+        if (!this.nativeBridge) {
+          throw new Error('Native bridge "NativeBridge" not found on window. Make sure the native app has injected the bridge object.');
+        }
+
+        if (typeof this.nativeBridge.postMessage !== 'function') {
+          throw new Error('Native bridge "NativeBridge" does not have postMessage method');
+        }
+
+        this.nativeBridge.onMessage = (message) => {
+          this.handleNativeMessage(message);
+        };
+
+        this.isInitialized = true;
+        this.log('log', 'MiniApp SDK initialized');
+        this.callMethod('miniapp.ready');
+      }
+
+      async call(method, params, options) {
+        return new Promise((resolve, reject) => {
+          const requestId = this.generateRequestId();
+          const timeout = options?.timeout ?? this.config.defaultTimeout;
+
+          const timeoutId = window.setTimeout(() => {
+            this.pendingCalls.delete(requestId);
+            reject(new Error(`Method call timeout: ${method}`));
+          }, timeout);
+
+          this.pendingCalls.set(requestId, {
+            resolve: (data) => {
+              clearTimeout(timeoutId);
+              resolve(data);
+            },
+            reject: (error) => {
+              clearTimeout(timeoutId);
+              reject(error);
+            },
+            timeout: timeoutId,
+          });
+
+          const success = this.callMethod(method, params, requestId);
+          if (!success) {
+            clearTimeout(timeoutId);
+            this.pendingCalls.delete(requestId);
+            reject(new Error(`Failed to send method call: ${method}`));
+          }
+        });
+      }
+
+      callMethod(method, params, requestId) {
+        if (!this.isInitialized) {
+          this.log('error', 'SDK not initialized. Call init() first.');
+          return false;
+        }
+
+        const call = { method, params, requestId };
+
+        try {
+          const message = JSON.stringify(call);
+          this.log('log', 'Calling method:', method, params);
+          this.nativeBridge.postMessage(message);
+          return true;
+        } catch (error) {
+          this.log('error', 'Failed to call method:', error);
+          return false;
+        }
+      }
+
+      on(eventType, listener) {
+        if (!this.eventListeners.has(eventType)) {
+          this.eventListeners.set(eventType, new Set());
+        }
+
+        this.eventListeners.get(eventType).add(listener);
+        this.log('log', 'Event listener added:', eventType);
+
+        return () => this.off(eventType, listener);
+      }
+
+      off(eventType, listener) {
+        const listeners = this.eventListeners.get(eventType);
+        if (listeners) {
+          listeners.delete(listener);
+          if (listeners.size === 0) {
+            this.eventListeners.delete(eventType);
+          }
+          this.log('log', 'Event listener removed:', eventType);
+        }
+      }
+
+      destroy() {
+        if (!this.isInitialized) return;
+
+        this.pendingCalls.forEach(({ timeout }) => clearTimeout(timeout));
+        this.pendingCalls.clear();
+        this.eventListeners.clear();
+
+        if (this.nativeBridge) {
+          this.nativeBridge.onMessage = null;
+          this.nativeBridge = null;
+        }
+
+        this.isInitialized = false;
+        this.log('log', 'MiniApp SDK destroyed');
+      }
+
+      handleNativeMessage(message) {
+        try {
+          const data = JSON.parse(message);
+
+          if (this.isMethodResponse(data)) {
+            this.handleMethodResponse(data);
+          } else if (this.isAppEvent(data)) {
+            this.handleAppEvent(data);
+          } else {
+            this.log('warn', 'Unknown message format:', data);
+          }
+        } catch (error) {
+          this.log('error', 'Failed to parse native message:', error);
+        }
+      }
+
+      handleMethodResponse(response) {
+        const pending = this.pendingCalls.get(response.requestId);
+        if (!pending) {
+          this.log('warn', 'Received response for unknown request:', response.requestId);
+          return;
+        }
+
+        this.pendingCalls.delete(response.requestId);
+
+        if (response.error) {
+          const error = new Error(response.error.message);
+          error.code = response.error.code;
+          pending.reject(error);
+        } else {
+          pending.resolve(response.data);
+        }
+      }
+
+      handleAppEvent(event) {
+        this.log('log', 'Received event:', event.type, event.data);
+
+        const listeners = this.eventListeners.get(event.type);
+        if (listeners) {
+          listeners.forEach((listener) => {
+            try {
+              listener(event.data);
+            } catch (error) {
+              this.log('error', 'Error in event listener:', error);
+            }
+          });
+        }
+      }
+
+      generateRequestId() {
+        return `req_${Date.now()}_${++this.requestIdCounter}`;
+      }
+
+      isMethodResponse(data) {
+        return typeof data === 'object' && 'requestId' in data;
+      }
+
+      isAppEvent(data) {
+        return typeof data === 'object' && 'type' in data;
+      }
+
+      log(level, ...args) {
+        if (this.config.debug || level !== 'log') {
+          console[level]('[MiniApp]', ...args);
+          if (typeof addLog === 'function') {
+            addLog(level.toUpperCase(), args.join(' '));
+          }
+        }
+      }
+    }
+
+    // 全局变量
+    let miniApp = null;
+    let eventCleanupFns = [];
+
+    // 模拟原生 Bridge
+    function setupMockBridge() {
+      window.NativeBridge = {
+        postMessage: function(message) {
+          addLog('SEND', `→ ${message}`);
+
+          // 模拟原生处理
+          setTimeout(() => {
+            const call = JSON.parse(message);
+
+            // 模拟处理不同的方法
+            switch (call.method) {
+              case 'miniapp.ready':
+                addLog('NATIVE', '小程序已准备好');
+                break;
+
+              case 'getUserInfo':
+                const response = {
+                  requestId: call.requestId,
+                  data: {
+                    id: '12345',
+                    name: '张三',
+                    avatar: 'https://via.placeholder.com/100'
+                  }
+                };
+                window.NativeBridge.onMessage(JSON.stringify(response));
+                break;
+
+              case 'showToast':
+                addLog('NATIVE', `显示 Toast: ${call.params?.message}`);
+                const toastResp = {
+                  requestId: call.requestId,
+                  data: { success: true }
+                };
+                window.NativeBridge.onMessage(JSON.stringify(toastResp));
+                break;
+
+              case 'openPage':
+                addLog('NATIVE', `打开页面: ${call.params?.url}`);
+                break;
+
+              default:
+                addLog('NATIVE', `未知方法: ${call.method}`);
+            }
+          }, 100);
+        },
+        onMessage: null
+      };
+
+      document.getElementById('init-btn').disabled = false;
+      addLog('INFO', '✓ 原生 Bridge 已模拟');
+      alert('原生 Bridge 已模拟，现在可以初始化 SDK 了');
+    }
+
+    // 初始化 SDK
+    function initSDK() {
+      try {
+        miniApp = new MiniApp({ debug: true });
+        miniApp.init('NativeBridge');
+
+        document.getElementById('sdk-status').innerHTML = '<span class="status success">已初始化</span>';
+
+        // 启用所有按钮
+        ['btn-user', 'btn-toast', 'btn-page', 'btn-sub', 'btn-unsub', 'btn-mock-event'].forEach(id => {
+          document.getElementById(id).disabled = false;
+        });
+
+        addLog('SUCCESS', '✓ SDK 初始化成功');
+      } catch (error) {
+        document.getElementById('sdk-status').innerHTML = `<span class="status error">初始化失败: ${error.message}</span>`;
+        addLog('ERROR', error.message);
+      }
+    }
+
+    // 获取用户信息
+    async function getUserInfo() {
+      try {
+        const user = await miniApp.call('getUserInfo');
+        showResult('method-result', user);
+        addLog('SUCCESS', '✓ 获取用户信息成功');
+      } catch (error) {
+        showResult('method-result', `Error: ${error.message}`);
+        addLog('ERROR', error.message);
+      }
+    }
+
+    // 显示 Toast
+    async function showToast() {
+      try {
+        await miniApp.call('showToast', {
+          message: '这是一个 Toast 消息',
+          duration: 2000
+        });
+        showResult('method-result', 'Toast 已显示');
+        addLog('SUCCESS', '✓ Toast 调用成功');
+      } catch (error) {
+        showResult('method-result', `Error: ${error.message}`);
+        addLog('ERROR', error.message);
+      }
+    }
+
+    // 打开页面
+    function openPage() {
+      miniApp.callMethod('openPage', {
+        url: '/profile',
+        params: { userId: '123' }
+      });
+      showResult('method-result', '页面跳转请求已发送');
+      addLog('INFO', '页面跳转请求已发送');
+    }
+
+    // 订阅事件
+    function subscribeEvents() {
+      eventCleanupFns.forEach(fn => fn());
+      eventCleanupFns = [];
+
+      const unsubTheme = miniApp.on('theme_changed', (theme) => {
+        addLog('EVENT', `收到事件 theme_changed: ${JSON.stringify(theme)}`);
+      });
+
+      const unsubNetwork = miniApp.on('network_changed', (network) => {
+        addLog('EVENT', `收到事件 network_changed: ${JSON.stringify(network)}`);
+      });
+
+      eventCleanupFns = [unsubTheme, unsubNetwork];
+      showResult('event-status', '已订阅事件: theme_changed, network_changed');
+      addLog('SUCCESS', '✓ 事件订阅成功');
+    }
+
+    // 取消订阅
+    function unsubscribeEvents() {
+      eventCleanupFns.forEach(fn => fn());
+      eventCleanupFns = [];
+      showResult('event-status', '已取消所有事件订阅');
+      addLog('INFO', '事件订阅已取消');
+    }
+
+    // 模拟原生发送事件
+    function sendMockEvent() {
+      const event = {
+        type: 'theme_changed',
+        data: { theme: 'dark' },
+        timestamp: Date.now()
+      };
+
+      if (window.NativeBridge && window.NativeBridge.onMessage) {
+        window.NativeBridge.onMessage(JSON.stringify(event));
+        addLog('NATIVE', `模拟发送事件: ${event.type}`);
+      }
+    }
+
+    // 显示结果
+    function showResult(elementId, data) {
+      const el = document.getElementById(elementId);
+      el.style.display = 'block';
+      el.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+    }
+
+    // 添加日志
+    function addLog(level, message) {
+      const logsEl = document.getElementById('logs');
+      const time = new Date().toLocaleTimeString();
+      const logItem = document.createElement('div');
+      logItem.className = 'log-item';
+      logItem.innerHTML = `<span class="log-time">${time}</span>[${level}] ${message}`;
+      logsEl.appendChild(logItem);
+      logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    // 清除日志
+    function clearLogs() {
+      document.getElementById('logs').innerHTML = '';
+    }
+
+    // 页面卸载时清理
+    window.addEventListener('beforeunload', () => {
+      if (miniApp) {
+        miniApp.destroy();
+      }
+    });
+  </script>
+</body>
+</html>
