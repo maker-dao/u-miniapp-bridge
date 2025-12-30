@@ -2,7 +2,7 @@
   "name": "u-miniapp-bridge",
   "version": "1.0.0",
   "description": "通用小程序通信 SDK - WebView 与原生 App 双向通信",
-  "author": "Your Name",
+  "author": "maker-dao",
   "license": "MIT",
   "type": "module",
   "main": "./dist/u-miniapp-bridge.umd.js",
@@ -41,12 +41,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/u-miniapp-bridge.git"
+    "url": "https://github.com/maker-dao/u-miniapp-bridge.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/u-miniapp-bridge/issues"
+    "url": "https://github.com/maker-dao/u-miniapp-bridge/issues"
   },
-  "homepage": "https://github.com/yourusername/u-miniapp-bridge#readme",
+  "homepage": "https://github.com/maker-dao/u-miniapp-bridge#readme",
   "devDependencies": {
     "typescript": "^5.0.0",
     "vite": "^5.0.0"
