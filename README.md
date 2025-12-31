@@ -2,7 +2,7 @@
 
 一个轻量级、零依赖的小程序通信 SDK，用于 WebView 与原生 App 之间的双向通信。
 
-[![npm version](https://img.shields.io/npm/v/miniapp-bridge.svg)](https://www.npmjs.com/package/u-miniapp-bridge)
+[![npm version](https://img.shields.io/npm/v/u-miniapp-bridge.svg)](https://www.npmjs.com/package/u-miniapp-bridge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 特性
